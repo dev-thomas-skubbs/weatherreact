@@ -147,54 +147,54 @@ function WeatherApp() {
     setError('')
 
     navigator.geolocation.getCurrentPosition(
-  async (position) => {
-    try {
-      const { latitude, longitude } = position.coords
-      const response = await fetch(
-        `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${API_KEY}&units=metric`
-      )
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch weather data for your location')
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords
+          const response = await fetch(
+            `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${API_KEY}&units=metric`
+          )
+          
+          if (!response.ok) {
+            throw new Error('Failed to fetch weather data for your location')
+          }
+          
+          const data: WeatherData = await response.json()
+          setWeather(data)
+          setError('')
+        } catch (err) {
+          if (err instanceof Error) {
+            setError(err.message)
+          } else {
+            setError('Failed to get weather for your location')
+          }
+        } finally {
+          setLoading(false)
+        }
+      },
+      (err) => {
+        let errorMessage = 'Unable to retrieve your location. '
+        switch (err.code) {
+          case 1:
+            errorMessage += 'Location access was denied.'
+            break
+          case 2:
+            errorMessage += 'Location information is unavailable.'
+            break
+          case 3:
+            errorMessage += 'Location request timed out.'
+            break
+          default:
+            errorMessage += 'Please try searching for a city instead.'
+            break
+        }
+        setError(errorMessage)
+        setLoading(false)
+      },
+      {
+        timeout: 10000,
+        enableHighAccuracy: false
       }
-      
-      const data: WeatherData = await response.json()
-      setWeather(data)
-      setError('')
-    } catch (err) {
-      if (err instanceof Error) {
-        setError(err.message)
-      } else {
-        setError('Failed to get weather for your location')
-      }
-    } finally {
-      setLoading(false)
-    }
-  },
-  (error) => {
-    let errorMessage = 'Unable to retrieve your location. '
-    switch (error.code) {
-      case 1: // PERMISSION_DENIED
-        errorMessage += 'Location access was denied.'
-        break
-      case 2: // POSITION_UNAVAILABLE
-        errorMessage += 'Location information is unavailable.'
-        break
-      case 3: // TIMEOUT
-        errorMessage += 'Location request timed out.'
-        break
-      default:
-        errorMessage += 'Please try searching for a city instead.'
-        break
-    }
-    setError(errorMessage)
-    setLoading(false)
-  },
-  {
-    timeout: 10000,
-    enableHighAccuracy: false
-  }
-)
+    )
   }
 
   const handleSearch = (e: React.FormEvent) => {
@@ -229,7 +229,7 @@ function WeatherApp() {
     if (!weather) {
       fetchWeatherByLocation()
     }
-  }, [weather])
+  }, [])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-400 via-blue-500 to-purple-600">
