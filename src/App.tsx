@@ -1,3 +1,28 @@
+import { useState, useEffect } from 'react'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+
+// Custom hook for localStorage persistence
+function usePersistedState<T>(key: string, defaultValue: T) {
+  const [state, setState] = useState<T>(() => {
+    try {
+      const item = window.localStorage.getItem(key)
+      return item ? JSON.parse(item) : defaultValue
+    } catch {
+      return defaultValue
+    }
+  })
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(key, JSON.stringify(state))
+    } catch {
+      // Handle localStorage errors silently
+    }
+  }, [key, state])
+
+  return [state, setState] as const
+}
+
 interface WeatherData {
   id: number
   name: string
@@ -56,10 +81,12 @@ interface FavoritesSectionProps {
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<WeatherApp />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<WeatherApp />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
   )
 }
 
@@ -202,7 +229,7 @@ function WeatherApp() {
     if (!weather) {
       fetchWeatherByLocation()
     }
-  }, [])
+  }, [weather])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-400 via-blue-500 to-purple-600">
