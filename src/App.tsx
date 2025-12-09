@@ -1,7 +1,8 @@
+// NEW FILE
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 
-// Custom hook for localStorage persistence - simplified without generics
+// Custom hook for localStorage persistence
 function usePersistedState(key: string, defaultValue: any): [any, (value: any) => void] {
   const [state, setState] = useState(() => {
     try {
@@ -124,7 +125,7 @@ function WeatherApp() {
       
       const data: WeatherData = await response.json()
       setWeather(data)
-      setError('') // Clear any previous errors
+      setError('')
     } catch (err) {
       if (err instanceof Error) {
         setError(err.message)
