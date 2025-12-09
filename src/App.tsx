@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 
 // Custom hook for localStorage persistence
-function usePersistedState<T>(key: string, defaultValue: T) {
-  const [state, setState] = useState<T>(() => {
+function usePersistedState<StateType>(key: string, defaultValue: StateType): [StateType, (value: StateType) => void] {
+  const [state, setState] = useState<StateType>(() => {
     try {
       const item = window.localStorage.getItem(key)
       return item ? JSON.parse(item) : defaultValue
@@ -20,7 +20,7 @@ function usePersistedState<T>(key: string, defaultValue: T) {
     }
   }, [key, state])
 
-  return [state, setState] as const
+  return [state, setState]
 }
 
 interface WeatherData {
