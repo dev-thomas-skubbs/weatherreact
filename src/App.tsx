@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 
-// Custom hook for localStorage persistence
-function usePersistedState<StateType>(key: string, defaultValue: StateType): [StateType, (value: StateType) => void] {
-  const [state, setState] = useState<StateType>(() => {
+// Custom hook for localStorage persistence - simplified without generics
+function usePersistedState(key: string, defaultValue: any): [any, (value: any) => void] {
+  const [state, setState] = useState(() => {
     try {
       const item = window.localStorage.getItem(key)
       return item ? JSON.parse(item) : defaultValue
@@ -91,11 +91,11 @@ export default function App() {
 }
 
 function WeatherApp() {
-  const [weather, setWeather] = usePersistedState<WeatherData | null>('weather', null)
+  const [weather, setWeather] = usePersistedState('weather', null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [city, setCity] = useState('')
-  const [favorites, setFavorites] = usePersistedState<FavoriteCity[]>('favorite-cities', [])
+  const [favorites, setFavorites] = usePersistedState('favorite-cities', [])
 
   const API_KEY = '0aeddd193be3c95b645124306bc7fceb'
 
@@ -207,7 +207,7 @@ function WeatherApp() {
   }
 
   const addToFavorites = () => {
-    if (weather && !favorites.some(fav => fav.id === weather.id)) {
+    if (weather && !favorites.some((fav: FavoriteCity) => fav.id === weather.id)) {
       setFavorites([...favorites, {
         id: weather.id,
         name: weather.name,
@@ -217,7 +217,7 @@ function WeatherApp() {
   }
 
   const removeFromFavorites = (cityId: number) => {
-    setFavorites(favorites.filter(fav => fav.id !== cityId))
+    setFavorites(favorites.filter((fav: FavoriteCity) => fav.id !== cityId))
   }
 
   const loadFavorite = (cityName: string) => {
@@ -271,7 +271,7 @@ function WeatherApp() {
             <WeatherCard 
               weather={weather}
               onAddToFavorites={addToFavorites}
-              isFavorite={favorites.some(fav => fav.id === weather.id)}
+              isFavorite={favorites.some((fav: FavoriteCity) => fav.id === weather.id)}
             />
           ) : (
             <div className="text-center text-white text-lg bg-white bg-opacity-10 backdrop-blur-lg rounded-2xl p-8">
@@ -460,7 +460,7 @@ function FavoritesSection({ favorites, onLoadFavorite, onRemoveFavorite }: Favor
     <div className="bg-white bg-opacity-10 backdrop-blur-lg rounded-2xl p-6 shadow-2xl">
       <h3 className="text-xl font-bold text-white mb-4">📍 Favorite Cities</h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {favorites.map((city) => (
+        {favorites.map((city: FavoriteCity) => (
           <div
             key={city.id}
             className="bg-white bg-opacity-10 rounded-lg p-4 hover:bg-opacity-20 transition-colors group"
