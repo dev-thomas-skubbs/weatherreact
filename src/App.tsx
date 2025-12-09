@@ -1,3 +1,59 @@
+interface WeatherData {
+  id: number
+  name: string
+  main: {
+    temp: number
+    feels_like: number
+    temp_min: number
+    temp_max: number
+    pressure: number
+    humidity: number
+  }
+  weather: Array<{
+    id: number
+    main: string
+    description: string
+    icon: string
+  }>
+  wind: {
+    speed: number
+    deg?: number
+  }
+  visibility: number
+  sys: {
+    country: string
+    sunrise: number
+    sunset: number
+  }
+  dt: number
+}
+
+interface FavoriteCity {
+  id: number
+  name: string
+  country: string
+}
+
+interface SearchSectionProps {
+  city: string
+  setCity: (city: string) => void
+  onSearch: (e: React.FormEvent) => void
+  onLocationSearch: () => void
+  loading: boolean
+}
+
+interface WeatherCardProps {
+  weather: WeatherData
+  onAddToFavorites: () => void
+  isFavorite: boolean
+}
+
+interface FavoritesSectionProps {
+  favorites: FavoriteCity[]
+  onLoadFavorite: (cityName: string) => void
+  onRemoveFavorite: (cityId: number) => void
+}
+
 export default function App() {
   return (
     <Routes>
@@ -8,31 +64,46 @@ export default function App() {
 }
 
 function WeatherApp() {
-  const [weather, setWeather] = usePersistedState('weather', null)
+  const [weather, setWeather] = usePersistedState<WeatherData | null>('weather', null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [city, setCity] = useState('')
-  const [favorites, setFavorites] = usePersistedState('favorite-cities', [])
+  const [favorites, setFavorites] = usePersistedState<FavoriteCity[]>('favorite-cities', [])
 
   const API_KEY = '0aeddd193be3c95b645124306bc7fceb'
 
-  const fetchWeather = async (cityName) => {
+  const fetchWeather = async (cityName: string) => {
     setLoading(true)
     setError('')
     
     try {
+      // Encode the city name to handle international characters and spaces
+      const encodedCityName = encodeURIComponent(cityName.trim())
       const response = await fetch(
-        `https://api.openweathermap.org/data/2.5/weather?q=${cityName}&appid=${API_KEY}&units=metric`
+        `https://api.openweathermap.org/data/2.5/weather?q=${encodedCityName}&appid=${API_KEY}&units=metric`
       )
       
       if (!response.ok) {
-        throw new Error('City not found')
+        if (response.status === 404) {
+          throw new Error(`City "${cityName}" not found. Please check the spelling and try again.`)
+        } else if (response.status === 401) {
+          throw new Error('Invalid API key. Please check your OpenWeather API configuration.')
+        } else if (response.status === 429) {
+          throw new Error('Too many requests. Please wait a moment and try again.')
+        } else {
+          throw new Error(`Failed to fetch weather data (${response.status}). Please try again.`)
+        }
       }
       
-      const data = await response.json()
+      const data: WeatherData = await response.json()
       setWeather(data)
+      setError('') // Clear any previous errors
     } catch (err) {
-      setError(err.message)
+      if (err instanceof Error) {
+        setError(err.message)
+      } else {
+        setError('An unexpected error occurred. Please try again.')
+      }
       setWeather(null)
     } finally {
       setLoading(false)
@@ -57,28 +128,53 @@ function WeatherApp() {
           )
           
           if (!response.ok) {
-            throw new Error('Failed to fetch weather data')
+            throw new Error('Failed to fetch weather data for your location')
           }
           
-          const data = await response.json()
+          const data: WeatherData = await response.json()
           setWeather(data)
+          setError('')
         } catch (err) {
-          setError(err.message)
+          if (err instanceof Error) {
+            setError(err.message)
+          } else {
+            setError('Failed to get weather for your location')
+          }
         } finally {
           setLoading(false)
         }
       },
-      () => {
-        setError('Unable to retrieve your location')
+      (error) => {
+        let errorMessage = 'Unable to retrieve your location. '
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage += 'Location access was denied.'
+            break
+          case error.POSITION_UNAVAILABLE:
+            errorMessage += 'Location information is unavailable.'
+            break
+          case error.TIMEOUT:
+            errorMessage += 'Location request timed out.'
+            break
+          default:
+            errorMessage += 'Please try searching for a city instead.'
+            break
+        }
+        setError(errorMessage)
         setLoading(false)
+      },
+      {
+        timeout: 10000, // 10 second timeout
+        enableHighAccuracy: false
       }
     )
   }
 
-  const handleSearch = (e) => {
+  const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
-    if (city.trim()) {
-      fetchWeather(city.trim())
+    const trimmedCity = city.trim()
+    if (trimmedCity) {
+      fetchWeather(trimmedCity)
       setCity('')
     }
   }
@@ -93,11 +189,11 @@ function WeatherApp() {
     }
   }
 
-  const removeFromFavorites = (cityId) => {
+  const removeFromFavorites = (cityId: number) => {
     setFavorites(favorites.filter(fav => fav.id !== cityId))
   }
 
-  const loadFavorite = (cityName) => {
+  const loadFavorite = (cityName: string) => {
     fetchWeather(cityName)
   }
 
@@ -118,7 +214,7 @@ function WeatherApp() {
               🌤️ Weather App
             </h1>
             <p className="text-blue-100 text-lg">
-              Get current weather conditions for any city
+              Get current weather conditions for any city worldwide
             </p>
           </div>
 
@@ -133,8 +229,11 @@ function WeatherApp() {
 
           {/* Error Display */}
           {error && (
-            <div className="mb-6 p-4 bg-red-500 text-white rounded-lg text-center">
-              {error}
+            <div className="mb-6 p-4 bg-red-500 bg-opacity-90 text-white rounded-lg shadow-lg">
+              <div className="flex items-center">
+                <span className="mr-2">⚠️</span>
+                <span>{error}</span>
+              </div>
             </div>
           )}
 
@@ -148,8 +247,12 @@ function WeatherApp() {
               isFavorite={favorites.some(fav => fav.id === weather.id)}
             />
           ) : (
-            <div className="text-center text-white text-lg">
-              Search for a city to see the weather forecast
+            <div className="text-center text-white text-lg bg-white bg-opacity-10 backdrop-blur-lg rounded-2xl p-8">
+              <div className="text-4xl mb-4">🔍</div>
+              <div>Search for a city to see the weather forecast</div>
+              <div className="text-sm text-blue-100 mt-2">
+                Try: "New York", "Tokyo", "Singapore", "London", etc.
+              </div>
             </div>
           )}
 
@@ -167,7 +270,7 @@ function WeatherApp() {
   )
 }
 
-function SearchSection({ city, setCity, onSearch, onLocationSearch, loading }) {
+function SearchSection({ city, setCity, onSearch, onLocationSearch, loading }: SearchSectionProps) {
   return (
     <div className="mb-8">
       <form onSubmit={onSearch} className="flex gap-2 mb-4">
@@ -176,8 +279,8 @@ function SearchSection({ city, setCity, onSearch, onLocationSearch, loading }) {
             type="text"
             value={city}
             onChange={(e) => setCity(e.target.value)}
-            placeholder="Enter city name..."
-            className="w-full px-4 py-3 rounded-lg border-0 shadow-lg focus:ring-4 focus:ring-blue-200 focus:outline-none text-gray-700"
+            placeholder="Enter city name (e.g., New York, Tokyo, Singapore)..."
+            className="w-full px-4 py-3 rounded-lg border-0 shadow-lg focus:ring-4 focus:ring-blue-200 focus:outline-none text-gray-700 placeholder-gray-400"
             disabled={loading}
           />
           <span className="absolute right-3 top-3 text-gray-400">🔍</span>
@@ -187,7 +290,7 @@ function SearchSection({ city, setCity, onSearch, onLocationSearch, loading }) {
           disabled={loading || !city.trim()}
           className="px-6 py-3 bg-white text-blue-600 rounded-lg shadow-lg hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed font-semibold transition-colors"
         >
-          Search
+          {loading ? 'Searching...' : 'Search'}
         </button>
       </form>
       
@@ -207,14 +310,17 @@ function SearchSection({ city, setCity, onSearch, onLocationSearch, loading }) {
 function LoadingSpinner() {
   return (
     <div className="flex justify-center items-center py-12">
-      <div className="animate-spin rounded-full h-12 w-12 border-4 border-white border-t-transparent"></div>
+      <div className="flex flex-col items-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-white border-t-transparent mb-4"></div>
+        <p className="text-white text-sm">Loading weather data...</p>
+      </div>
     </div>
   )
 }
 
-function WeatherCard({ weather, onAddToFavorites, isFavorite }) {
-  const getWeatherIcon = (code) => {
-    const iconMap = {
+function WeatherCard({ weather, onAddToFavorites, isFavorite }: WeatherCardProps) {
+  const getWeatherIcon = (code: string) => {
+    const iconMap: { [key: string]: string } = {
       '01d': '☀️', '01n': '🌙',
       '02d': '⛅', '02n': '☁️',
       '03d': '☁️', '03n': '☁️',
@@ -238,11 +344,14 @@ function WeatherCard({ weather, onAddToFavorites, isFavorite }) {
           <p className="text-blue-100 capitalize">
             {weather.weather[0].description}
           </p>
+          <p className="text-xs text-blue-200 mt-1">
+            Updated: {new Date(weather.dt * 1000).toLocaleString()}
+          </p>
         </div>
         <button
           onClick={onAddToFavorites}
           disabled={isFavorite}
-          className={`p-2 rounded-full transition-colors ${
+          className={`p-2 rounded-full transition-colors text-2xl ${
             isFavorite 
               ? 'text-yellow-300 cursor-default' 
               : 'text-white hover:text-yellow-300 hover:bg-white hover:bg-opacity-10'
@@ -256,7 +365,7 @@ function WeatherCard({ weather, onAddToFavorites, isFavorite }) {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Main Temperature */}
         <div className="text-center">
-          <div className="text-6xl mb-2">{getWeatherIcon()}</div>
+          <div className="text-6xl mb-2">{getWeatherIcon(weather.weather[0].icon)}</div>
           <div className="text-4xl font-bold mb-1">
             {Math.round(weather.main.temp)}°C
           </div>
@@ -319,7 +428,7 @@ function WeatherCard({ weather, onAddToFavorites, isFavorite }) {
   )
 }
 
-function FavoritesSection({ favorites, onLoadFavorite, onRemoveFavorite }) {
+function FavoritesSection({ favorites, onLoadFavorite, onRemoveFavorite }: FavoritesSectionProps) {
   return (
     <div className="bg-white bg-opacity-10 backdrop-blur-lg rounded-2xl p-6 shadow-2xl">
       <h3 className="text-xl font-bold text-white mb-4">📍 Favorite Cities</h3>
@@ -339,7 +448,7 @@ function FavoritesSection({ favorites, onLoadFavorite, onRemoveFavorite }) {
               </button>
               <button
                 onClick={() => onRemoveFavorite(city.id)}
-                className="text-red-300 hover:text-red-200 opacity-0 group-hover:opacity-100 transition-opacity ml-2"
+                className="text-red-300 hover:text-red-200 opacity-0 group-hover:opacity-100 transition-opacity ml-2 text-xl"
                 title="Remove from favorites"
               >
                 ×
